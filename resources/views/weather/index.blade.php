@@ -165,10 +165,24 @@
         .search-input {
             outline: none;
             transition: all 0.3s ease;
+            font-size: 1.125rem;
+            letter-spacing: 0.5px;
+            caret-color: #93c5fd;
+            font-weight: 500;
+        }
+
+        .search-input::placeholder {
+            color: rgba(147, 197, 253, 0.6) !important;
+            font-weight: 400;
         }
 
         .search-input:focus {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+        }
+
+        .search-input:focus::placeholder {
+            color: rgba(147, 197, 253, 0.4) !important;
         }
 
         .temp-display {
@@ -414,47 +428,58 @@
             position: absolute;
             top: 100%;
             left: 0;
-            right: 0;
-            background: rgba(30, 58, 95, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 15px;
+            background: rgba(15, 23, 42, 0.98);
+            backdrop-filter: blur(25px);
+            border: 2px solid rgba(96, 165, 250, 0.4);
+            border-radius: 18px;
             margin-top: 8px;
-            z-index: 50;
-            max-height: 300px;
+            z-index: 9999;
+            max-height: 400px;
             overflow-y: auto;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            width: 100%;
         }
 
         .suggestion-item {
-            padding: 12px 16px;
+            padding: 16px 18px;
             cursor: pointer;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            transition: background 0.2s ease;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .suggestion-item:first-child {
+            padding-top: 12px;
         }
 
         .suggestion-item:last-child {
             border-bottom: none;
+            padding-bottom: 12px;
         }
 
         .suggestion-item:hover {
-            background: rgba(59, 130, 246, 0.2);
+            background: rgba(59, 130, 246, 0.3);
+            padding-left: 22px;
         }
 
         .suggestion-city {
-            font-weight: 600;
+            font-weight: 700;
             color: #fff;
-            font-size: 0.95rem;
+            font-size: 1rem;
+            letter-spacing: 0.3px;
         }
 
         .suggestion-country {
-            font-size: 0.8rem;
-            color: rgba(186, 230, 253, 0.6);
-            margin-top: 4px;
+            font-size: 0.85rem;
+            color: rgba(156, 163, 175, 0.9);
+            margin-top: 2px;
         }
 
         .search-container {
             position: relative;
+            z-index: 100;
         }
 
         /* Favorite Button */
@@ -490,10 +515,10 @@
     </div>
 
     {{-- Enhanced Search Form --}}
-    <div class="w-full max-w-2xl mb-10 fade-in-delay">
+    <div class="w-full max-w-2xl mb-10 fade-in-delay relative z-50">
         <form action="{{ route('weather.search') }}" method="POST" id="searchForm">
             @csrf
-            <div class="search-container">
+            <div class="search-container relative">
                 <div class="flex gap-3 flex-col sm:flex-row">
                     <div class="flex-1 glass rounded-2xl px-6 py-4 flex items-center gap-3 group relative">
                         <svg class="w-6 h-6 text-blue-300 flex-shrink-0 group-focus-within:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,7 +535,6 @@
                             class="search-input bg-transparent flex-1 text-white placeholder-blue-300/40 text-base font-medium"
                             autocomplete="off"
                         >
-                        <div id="suggestionsDropdown" class="suggestions-list hidden"></div>
                     </div>
                     <button type="submit" class="search-btn glass rounded-2xl px-8 py-4 font-semibold text-white whitespace-nowrap flex items-center gap-2 justify-center min-h-[56px]" id="searchBtn">
                         <span id="searchBtnText">Discover</span>
@@ -520,6 +544,7 @@
                         <svg id="searchBtnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                     </button>
                 </div>
+                <div id="suggestionsDropdown" class="suggestions-list hidden"></div>
 
                 @if ($errors->any())
                     <div class="mt-4 p-4 rounded-xl bg-red-500/20 border border-red-400/30 text-red-200 text-sm">
@@ -615,6 +640,11 @@ const cityInput = document.getElementById('cityInput');
 const suggestionsDropdown = document.getElementById('suggestionsDropdown');
 let suggestionTimeout;
 
+function positionDropdown() {
+    // Absolute positioning handles this automatically
+    // No manual positioning needed
+}
+
 cityInput.addEventListener('input', function() {
     clearTimeout(suggestionTimeout);
     const query = this.value.trim();
@@ -640,10 +670,25 @@ cityInput.addEventListener('input', function() {
                     </div>
                 `).join('');
 
+                positionDropdown();
                 suggestionsDropdown.classList.remove('hidden');
             })
             .catch(() => suggestionsDropdown.classList.add('hidden'));
     }, 300);
+});
+
+// Reposition on input focus
+cityInput.addEventListener('focus', function() {
+    if (!suggestionsDropdown.classList.contains('hidden')) {
+        positionDropdown();
+    }
+});
+
+// Reposition on window resize
+window.addEventListener('resize', function() {
+    if (!suggestionsDropdown.classList.contains('hidden')) {
+        positionDropdown();
+    }
 });
 
 function selectSuggestion(city) {
@@ -654,7 +699,7 @@ function selectSuggestion(city) {
 
 // Close suggestions when clicking outside
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.search-container')) {
+    if (!e.target.closest('.search-container') && e.target !== suggestionsDropdown) {
         suggestionsDropdown.classList.add('hidden');
     }
 });
