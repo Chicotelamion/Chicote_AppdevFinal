@@ -131,8 +131,9 @@
             height: 100%;
             top: 0;
             left: 0;
-            z-index: -1;
+            z-index: 0;
             pointer-events: none;
+            overflow: hidden;
         }
 
         .rain-drop {
@@ -352,7 +353,7 @@
 
         .relative-wrapper {
             position: relative;
-            z-index: 1;
+            z-index: 50;
             width: 100%;
             display: flex;
             flex-direction: column;
@@ -497,7 +498,10 @@
         }
     </style>
 </head>
+
 <body class="sky-bg text-white overflow-x-hidden">
+
+<div id="rain" class="rain-container" aria-hidden="true"></div>
 
 <div class="relative-wrapper flex flex-col items-center px-4 py-8 md:py-12 min-h-screen w-full">
 
@@ -723,6 +727,34 @@ cityInput.addEventListener('keypress', function(e) {
         document.getElementById('searchForm').submit();
     }
 });
+// Rain generator
+;(function generateRain(){
+    const rainContainer = document.getElementById('rain');
+    if (!rainContainer) return;
+
+    const drops = 100; // adjust amount for density
+    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+
+    for (let i = 0; i < drops; i++) {
+        const drop = document.createElement('div');
+        drop.className = 'rain-drop';
+        const left = Math.random() * 100; // percent
+        const delay = Math.random() * -20; // negative to stagger
+        const duration = 0.6 + Math.random() * 0.9; // 0.6s - 1.5s
+        const height = 8 + Math.random() * 18; // px
+
+        drop.style.left = left + '%';
+        drop.style.height = height + 'px';
+        drop.style.animationDuration = duration + 's';
+        drop.style.animationDelay = delay + 's';
+        drop.style.opacity = (0.2 + Math.random() * 0.6).toString();
+
+        rainContainer.appendChild(drop);
+    }
+
+    // Add a subtle skew so raindrops tilt (CSS transform via animation isn't necessary)
+})();
+
 </script>
 
 </body>
