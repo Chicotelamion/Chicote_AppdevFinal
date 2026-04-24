@@ -8,4 +8,5 @@ Route::post('/search', [WeatherController::class, 'search'])->name('weather.sear
 Route::get('/city/{city}', [WeatherController::class, 'viewCity'])->name('weather.view');
 Route::post('/clear-history', [WeatherController::class, 'clearHistory'])->name('weather.clearHistory');
 Route::post('/toggle-favorite', [WeatherController::class, 'toggleFavorite'])->name('weather.toggleFavorite');
+Route::delete('/favorites', [WeatherController::class, 'removeFavorite'])->name('weather.removeFavorite');
 Route::get('/api/suggestions', [WeatherController::class, 'citySuggestions'])->name('weather.suggestions');

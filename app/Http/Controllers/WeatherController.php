@@ -2,185 +2,137 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Favorite;
+use App\Models\SearchHistory;
+use App\Services\WeatherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use App\Models\SearchHistory;
-use App\Models\Favorite;
 
 class WeatherController extends Controller
 {
+    public function __construct(private WeatherService $weatherService)
+    {
+    }
+
     public function index()
     {
+        $unit = $this->currentUnit(request());
         $history = SearchHistory::latest()->take(10)->get();
         $favorites = Favorite::latest()->get();
-        return view('weather.index', compact('history', 'favorites'));
+        $favoriteSnapshots = $this->weatherService->getFavoriteSnapshots($favorites, $unit);
+        $compareSnapshots = $favoriteSnapshots->take(3)->values();
+
+        return view('weather.index', [
+            'history' => $history,
+            'favorites' => $favorites,
+            'favoriteSnapshots' => $favoriteSnapshots,
+            'compareSnapshots' => $compareSnapshots,
+            'unit' => $this->weatherService->getUnitMeta($unit),
+        ]);
     }
 
     public function search(Request $request)
     {
         $request->validate([
-            'city' => 'required|string|max:100',
+            'city' => 'nullable|string|max:100|required_without_all:lat,lon',
+            'lat' => 'nullable|numeric|required_with:lon',
+            'lon' => 'nullable|numeric|required_with:lat',
         ]);
 
-        $city    = trim($request->input('city'));
-        $apiKey  = env('OPENWEATHER_API_KEY');
-        $url     = "https://api.openweathermap.org/data/2.5/weather";
+        $unit = $this->currentUnit($request);
 
-        $response = Http::get($url, [
-            'q'     => $city,
-            'appid' => $apiKey,
-            'units' => 'metric',
-        ]);
-
-        if ($response->failed() || $response->json('cod') !== 200) {
+        try {
+            if ($request->filled('lat') && $request->filled('lon')) {
+                $weather = $this->weatherService->getByCoordinates(
+                    (float) $request->input('lat'),
+                    (float) $request->input('lon'),
+                    $unit
+                );
+            } else {
+                $weather = $this->weatherService->getByCity((string) $request->input('city'), $unit);
+            }
+        } catch (\Throwable $exception) {
             return back()->withErrors(['city' => 'City not found. Please try again.'])->withInput();
         }
 
-        $data = $response->json();
-
-        // Detect if it's raining
-        $mainWeather = $data['weather'][0]['main'];
-        $weatherCode = $data['weather'][0]['icon'];
-        $isRaining = in_array($mainWeather, ['Rain', 'Thunderstorm', 'Drizzle']);
-        $rainChance = isset($data['rain']) ? ($data['rain']['1h'] ?? 0) : 0;
-        $precipitation = isset($data['rain']) ? ($data['rain']['1h'] ?? 0) : (isset($data['snow']) ? ($data['snow']['1h'] ?? 0) : 0);
-
-        $weather = [
-            'city'        => $data['name'],
-            'country'     => $data['sys']['country'],
-            'temperature' => round($data['main']['temp']),
-            'feels_like'  => round($data['main']['feels_like']),
-            'humidity'    => $data['main']['humidity'],
-            'wind_speed'  => round($data['wind']['speed'] * 3.6), // m/s to km/h
-            'condition'   => $data['weather'][0]['description'],
-            'icon'        => $weatherCode,
-            'temp_min'    => round($data['main']['temp_min']),
-            'temp_max'    => round($data['main']['temp_max']),
-            'is_raining'  => $isRaining,
-            'main_weather' => $mainWeather,
-            'rain_mm'     => round($precipitation, 1),
-            'visibility'  => round(($data['visibility'] ?? 10000) / 1000, 1), // Convert to km
-            'pressure'    => $data['main']['pressure'] ?? 1013,
-            'bg_theme'    => $this->getBackgroundTheme($mainWeather, $data['main']['temp']),
-            'is_favorited' => Favorite::where('city', $data['name'])->where('country', $data['sys']['country'])->exists(),
-        ];
-
-        // Save to search history
-        SearchHistory::create([
-            'city'        => $weather['city'],
-            'country'     => $weather['country'],
-            'temperature' => $weather['temperature'],
-            'condition'   => $weather['condition'],
-            'icon'        => $weather['icon'],
-        ]);
-
-        $history = SearchHistory::latest()->take(10)->get();
-        $favorites = Favorite::latest()->get();
-
-        return view('weather.result', compact('weather', 'history', 'favorites'));
+        return $this->renderWeatherResult($weather, ['source' => $request->input('source')]);
     }
 
-    public function viewCity($city)
+    public function viewCity(Request $request, $city)
     {
-        $city    = urldecode($city);
-        $apiKey  = env('OPENWEATHER_API_KEY');
-        $url     = "https://api.openweathermap.org/data/2.5/weather";
+        $city = urldecode($city);
 
-        $response = Http::get($url, [
-            'q'     => $city,
-            'appid' => $apiKey,
-            'units' => 'metric',
-        ]);
-
-        if ($response->failed() || $response->json('cod') !== 200) {
+        try {
+            $weather = $this->weatherService->getByCity($city, $this->currentUnit($request));
+        } catch (\Throwable $exception) {
             return redirect()->route('weather.index')->withErrors(['city' => 'City not found. Please try again.']);
         }
 
-        $data = $response->json();
-
-        // Detect if it's raining
-        $mainWeather = $data['weather'][0]['main'];
-        $weatherCode = $data['weather'][0]['icon'];
-        $isRaining = in_array($mainWeather, ['Rain', 'Thunderstorm', 'Drizzle']);
-        $precipitation = isset($data['rain']) ? ($data['rain']['1h'] ?? 0) : (isset($data['snow']) ? ($data['snow']['1h'] ?? 0) : 0);
-
-        $weather = [
-            'city'        => $data['name'],
-            'country'     => $data['sys']['country'],
-            'temperature' => round($data['main']['temp']),
-            'feels_like'  => round($data['main']['feels_like']),
-            'humidity'    => $data['main']['humidity'],
-            'wind_speed'  => round($data['wind']['speed'] * 3.6),
-            'condition'   => $data['weather'][0]['description'],
-            'icon'        => $weatherCode,
-            'temp_min'    => round($data['main']['temp_min']),
-            'temp_max'    => round($data['main']['temp_max']),
-            'is_raining'  => $isRaining,
-            'main_weather' => $mainWeather,
-            'rain_mm'     => round($precipitation, 1),
-            'visibility'  => round(($data['visibility'] ?? 10000) / 1000, 1),
-            'pressure'    => $data['main']['pressure'] ?? 1013,
-            'bg_theme'    => $this->getBackgroundTheme($mainWeather, $data['main']['temp']),
-            'is_favorited' => Favorite::where('city', $data['name'])->where('country', $data['sys']['country'])->exists(),
-        ];
-
-        $history = SearchHistory::latest()->take(10)->get();
-        $favorites = Favorite::latest()->get();
-
-        return view('weather.result', compact('weather', 'history', 'favorites'));
-    }
-
-    private function getBackgroundTheme($mainWeather, $temperature)
-    {
-        if (in_array($mainWeather, ['Rain', 'Thunderstorm', 'Drizzle'])) {
-            return 'rainy';
-        } elseif (in_array($mainWeather, ['Clouds', 'Mist', 'Smoke', 'Haze', 'Dust', 'Fog', 'Sand', 'Ash', 'Squall', 'Tornado'])) {
-            return 'cloudy';
-        } elseif ($mainWeather === 'Clear') {
-            return $temperature > 20 ? 'sunny' : 'night';
-        } elseif (in_array($mainWeather, ['Snow'])) {
-            return 'cloudy';
-        } else {
-            return 'cloudy';
-        }
+        return $this->renderWeatherResult($weather, ['source' => $request->query('source')]);
     }
 
     public function clearHistory()
     {
-        SearchHistory::truncate();
-        return redirect()->route('weather.index')->with('success', 'Search history cleared successfully!');
+        SearchHistory::query()->delete();
+
+        return redirect()->route('weather.index')->with('status', 'Search history cleared successfully.');
     }
 
     public function toggleFavorite(Request $request)
     {
+        try {
+            $request->validate([
+                'city' => 'required|string|max:100',
+                'country' => 'nullable|string|max:100',
+                'temperature' => 'nullable|numeric',
+                'condition' => 'nullable|string',
+                'icon' => 'nullable|string',
+            ]);
+
+            $city = trim($request->input('city'));
+            $country = $request->input('country');
+
+            $existing = Favorite::where('city', $city)->where('country', $country)->first();
+
+            if ($existing) {
+                $existing->delete();
+                $isFavorited = false;
+            } else {
+                Favorite::create([
+                    'city' => $city,
+                    'country' => $country,
+                    'temperature' => $request->input('temperature'),
+                    'condition' => $request->input('condition'),
+                    'icon' => $request->input('icon'),
+                ]);
+                $isFavorited = true;
+            }
+
+            return response()->json(['is_favorited' => $isFavorited]);
+        } catch (\Exception $e) {
+            \Log::error('Toggle Favorite Error: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'error' => 'Failed to toggle favorite',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function removeFavorite(Request $request)
+    {
         $request->validate([
             'city' => 'required|string|max:100',
             'country' => 'nullable|string|max:100',
-            'temperature' => 'nullable|numeric',
-            'condition' => 'nullable|string',
-            'icon' => 'nullable|string',
         ]);
 
-        $city = trim($request->input('city'));
-        $country = $request->input('country');
+        Favorite::where('city', trim((string) $request->input('city')))
+            ->where('country', $request->input('country'))
+            ->delete();
 
-        $existing = Favorite::where('city', $city)->where('country', $country)->first();
-
-        if ($existing) {
-            $existing->delete();
-            $isFavorited = false;
-        } else {
-            Favorite::create([
-                'city' => $city,
-                'country' => $country,
-                'temperature' => $request->input('temperature'),
-                'condition' => $request->input('condition'),
-                'icon' => $request->input('icon'),
-            ]);
-            $isFavorited = true;
-        }
-
-        return response()->json(['is_favorited' => $isFavorited]);
+        return back()->with('status', 'City removed from favorites.');
     }
 
     public function citySuggestions(Request $request)
@@ -226,5 +178,59 @@ class WeatherController extends Controller
         } catch (\Exception $e) {
             return response()->json([]);
         }
+    }
+
+    private function renderWeatherResult(array $weather, array $viewState = [])
+    {
+        $weather['is_favorited'] = Favorite::where('city', $weather['city'])
+            ->where('country', $weather['country'])
+            ->exists();
+
+        $this->storeSearchHistory($weather);
+
+        $history = SearchHistory::latest()->take(10)->get();
+        $favorites = Favorite::latest()->get();
+        $favoriteSnapshots = $this->weatherService->getFavoriteSnapshots($favorites, $weather['unit']['value']);
+
+        return view('weather.result', [
+            'weather' => $weather,
+            'history' => $history,
+            'favorites' => $favorites,
+            'favoriteSnapshots' => $favoriteSnapshots,
+            'viewState' => $viewState,
+        ]);
+    }
+
+    private function storeSearchHistory(array $weather): void
+    {
+        $latest = SearchHistory::latest()->first();
+
+        if ($latest && $latest->city === $weather['city'] && $latest->country === $weather['country']) {
+            $latest->update([
+                'temperature' => $weather['temperature'],
+                'condition' => $weather['condition'],
+                'icon' => $weather['icon'],
+                'updated_at' => now(),
+            ]);
+
+            return;
+        }
+
+        SearchHistory::create([
+            'city' => $weather['city'],
+            'country' => $weather['country'],
+            'temperature' => $weather['temperature'],
+            'condition' => $weather['condition'],
+            'icon' => $weather['icon'],
+        ]);
+    }
+
+    private function currentUnit(Request $request): string
+    {
+        $requested = $request->input('unit', $request->query('unit', session('weather_unit', 'metric')));
+        $unit = $this->weatherService->resolveUnit($requested);
+        session(['weather_unit' => $unit]);
+
+        return $unit;
     }
 }

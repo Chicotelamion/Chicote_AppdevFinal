@@ -3,623 +3,521 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $weather['city'] }} - WeatherNow</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ $weather['city'] }} Weather - WeatherNow</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { height: auto; overflow-y: auto; }
-        body { font-family: 'DM Sans', sans-serif; overflow-x: hidden; height: auto; }
-        .mono { font-family: 'Space Mono', monospace; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(170, 214, 210, 0.16), transparent 28%),
+                radial-gradient(circle at 75% 25%, rgba(145, 187, 196, 0.12), transparent 24%),
+                linear-gradient(135deg, #2f4b4b 0%, #142222 48%, #0b1415 100%);
+        }
         .display { font-family: 'Poppins', sans-serif; }
-
-        .sky-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #2d6a9f 100%);
-            min-height: auto;
-            position: relative;
-            overflow: visible;
-        }
-
-        /* Cloud animations */
-        .sky-bg::before {
-            content: '';
+        .mono { font-family: 'Space Mono', monospace; }
+        .scene {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
-            animation: moveGradient 15s ease infinite;
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        /* Animated clouds */
-        .sky-bg::after {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(ellipse 800px 100px at 20% 20%, rgba(255,255,255,0.15) 0%, transparent 50%),
-                radial-gradient(ellipse 600px 80px at 80% 10%, rgba(255,255,255,0.1) 0%, transparent 50%),
-                radial-gradient(ellipse 700px 90px at 50% 30%, rgba(255,255,255,0.12) 0%, transparent 50%);
-            background-size: 400% 400%, 300% 300%, 350% 350%;
-            animation: cloudFloat 20s ease-in-out infinite, cloudFloat2 25s ease-in-out infinite 5s;
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        @keyframes cloudFloat {
-            0% { background-position: 0% 0%, 0% 0%, 0% 0%; }
-            50% { background-position: 100% 0%, 100% 0%, 100% 0%; }
-            100% { background-position: 0% 0%, 0% 0%, 0% 0%; }
-        }
-
-        @keyframes cloudFloat2 {
-            0% { background-position: 100% 0%, 0% 0%, 50% 0%; }
-            50% { background-position: 0% 0%, 100% 0%, -50% 0%; }
-            100% { background-position: 100% 0%, 0% 0%, 50% 0%; }
-        }
-
-        @keyframes moveGradient {
-            0% { transform: translate(0, 0); }
-            50% { transform: translate(50px, 50px); }
-            100% { transform: translate(0, 0); }
-        }
-
-        /* Falling rain effect */
-        .rain-container {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: 0;
-            pointer-events: none;
+            inset: 0;
             overflow: hidden;
+            pointer-events: none;
         }
-
-        .rain-drop {
-            position: absolute;
-            width: 2px;
-            height: 15px;
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0));
-            animation: rainFall linear infinite;
-            opacity: 0.6;
-        }
-
-        @keyframes rainFall {
-            to {
-                transform: translateY(100vh);
-                opacity: 0;
-            }
-        }
-
-        /* Ensure relative wrapper is above rain */
-        .relative-wrapper {
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Weather-specific backgrounds */
-        .sky-bg.sunny {
-            background: linear-gradient(135deg, #FFD89B 0%, #FFA500 50%, #87CEEB 100%);
-        }
-
-        .sky-bg.cloudy {
-            background: linear-gradient(135deg, #B0C4DE 0%, #708090 50%, #36454F 100%);
-        }
-
-        .sky-bg.rainy {
-            background: linear-gradient(135deg, #2C3E50 0%, #34495E 50%, #1A252F 100%);
-        }
-
-        .sky-bg.night {
-            background: linear-gradient(135deg, #0a0e27 0%, #16213e 50%, #0f3460 100%);
-        }
-
-        .sky-bg.sunset {
-            background: linear-gradient(135deg, #FF6B6B 0%, #FFA07A 50%, #FFD700 100%);
-        }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
-        }
-
-        .glass:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.25);
-            transform: translateY(-4px);
-        }
-
-        .temp-display {
-            font-size: clamp(5rem, 15vw, 9rem);
-            line-height: 1;
-            font-weight: 800;
-            background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: pulse-light 3s ease-in-out infinite;
-        }
-
-        @keyframes pulse-light {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
-        }
-
-        .weather-icon {
-            animation: float 4s ease-in-out infinite;
-            filter: drop-shadow(0 0 30px rgba(100, 200, 255, 0.5));
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-
-        .history-item {
-            transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
-            border-left: 3px solid transparent;
-        }
-
-        .history-item:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-left-color: rgba(96, 165, 250, 0.8);
-            padding-left: 18px;
-            transform: translateX(4px);
-        }
-
-        .stat-card {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
+        .scene::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            animation: shimmer 2s infinite;
+            inset: -10%;
+            background:
+                radial-gradient(circle at 18% 45%, rgba(198, 230, 226, 0.18), transparent 22%),
+                radial-gradient(circle at 68% 70%, rgba(188, 219, 214, 0.16), transparent 20%),
+                radial-gradient(circle at 72% 24%, rgba(255, 255, 255, 0.05), transparent 18%);
+            filter: blur(24px);
+            animation: mistShift 14s ease-in-out infinite alternate;
         }
-
-        @keyframes shimmer {
-            100% { left: 100%; }
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .fade-in { animation: fadeInUp 0.6s ease 0.1s both; }
-        .fade-in-delay { animation: fadeInUp 0.6s ease 0.3s both; }
-        .fade-in-delay-2 { animation: fadeInUp 0.6s ease 0.5s both; }
-
-        .badge {
-            display: inline-block;
-            padding: 0.35rem 0.85rem;
-            background: rgba(59, 130, 246, 0.2);
-            border: 1px solid rgba(59, 130, 246, 0.4);
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .stat-label {
-            position: relative;
-            z-index: 1;
-        }
-
-        .weather-card {
-            position: relative;
-            border-radius: 20px;
-            overflow: hidden;
-        }
-
-        .weather-card::after {
+        .scene::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
-            pointer-events: none;
+            background: linear-gradient(180deg, rgba(7, 15, 16, 0.1), rgba(7, 15, 16, 0.42));
         }
-
-        .rain-alert {
-            animation: slideDown 0.4s ease-out;
+        .rain-drop {
+            position: absolute;
+            top: -18vh;
+            width: 1.8px;
+            height: 88px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, rgba(255,255,255,0), rgba(220, 239, 238, 0.85));
+            transform: rotate(13deg);
+            animation: rain linear infinite;
+            opacity: 0.38;
         }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .rain-drop::after {
+            content: '';
+            position: absolute;
+            left: -7px;
+            bottom: -8px;
+            width: 16px;
+            height: 9px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(223, 245, 244, 0.22) 0%, rgba(223, 245, 244, 0) 72%);
         }
-
-        .weather-card.raining {
-            border: 1px solid rgba(59, 130, 246, 0.5);
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
-        }
-
-        .relative-wrapper {
+        .dashboard {
             position: relative;
             z-index: 1;
-            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 16px;
+        }
+        .weather-shell {
+            width: min(1180px, 100%);
+            position: relative;
+            border-radius: 30px;
+            overflow: hidden;
+            background: rgba(18, 28, 29, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 24px 90px rgba(0, 0, 0, 0.32);
+            backdrop-filter: blur(16px);
+        }
+        .weather-shell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 38%, rgba(255,255,255,0.08), transparent 28%),
+                radial-gradient(circle at 82% 65%, rgba(196, 228, 223, 0.08), transparent 24%);
+            pointer-events: none;
+        }
+        .glass-noise {
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(255,255,255,0.14) 0 1px, transparent 1px),
+                radial-gradient(circle at 40% 70%, rgba(255,255,255,0.08) 0 1px, transparent 1px),
+                radial-gradient(circle at 78% 36%, rgba(255,255,255,0.12) 0 1px, transparent 1px),
+                radial-gradient(circle at 62% 14%, rgba(255,255,255,0.08) 0 1px, transparent 1px);
+            background-size: 120px 120px, 150px 150px, 180px 180px, 130px 130px;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1.15fr 0.95fr;
+            gap: 28px;
+            padding: 28px;
+            min-height: 72vh;
+        }
+        .left-panel {
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
+            padding: 22px;
+        }
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            padding: 18px;
+        }
+        .soft-panel {
+            background: rgba(10, 17, 18, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 22px;
+            backdrop-filter: blur(14px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+        .temp-number {
+            font-family: 'Poppins', sans-serif;
+            font-size: clamp(4.5rem, 10vw, 7rem);
+            line-height: 0.95;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+        }
+        .section-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.28em;
+            color: rgba(228, 241, 240, 0.58);
+        }
+        .forecast-row {
+            display: grid;
+            grid-template-columns: 48px 1fr 44px;
+            gap: 12px;
             align-items: center;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
-
-        .back-btn {
+        .forecast-row:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+        .mini-hours {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .mini-hour {
+            text-align: center;
+            padding: 10px 6px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .metric-card {
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .action-btn {
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-size: 0.92rem;
             font-weight: 600;
-            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.08);
+            transition: 0.2s ease;
         }
-
-        .back-btn:hover {
-            transform: translateX(-4px);
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.14);
         }
-
-        .rain-drops {
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            color: rgba(224, 247, 250, 0.9);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .bottom-strip {
             position: relative;
-            overflow: hidden;
-            height: 200px;
-            border-radius: 20px;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            padding: 0 28px 28px;
         }
-
-        .drop {
-            position: absolute;
-            width: 2px;
-            background: linear-gradient(to bottom, rgba(96, 165, 250, 0.8), transparent);
-            animation: fall linear infinite;
+        .strip-card {
+            padding: 18px;
+            border-radius: 22px;
+            background: rgba(10, 17, 18, 0.32);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
-
-        @keyframes fall {
-            to { transform: translateY(200px); }
+        @keyframes rain {
+            0% {
+                transform: translate3d(0, 0, 0) rotate(13deg);
+                opacity: 0;
+            }
+            12% {
+                opacity: 0.38;
+            }
+            100% {
+                transform: translate3d(-14vw, 132vh, 0) rotate(13deg);
+                opacity: 0;
+            }
         }
-
-        .drop:nth-child(1) { left: 10%; height: 100px; animation-duration: 1s; animation-delay: 0s; }
-        .drop:nth-child(2) { left: 20%; height: 120px; animation-duration: 1.2s; animation-delay: 0.2s; }
-        .drop:nth-child(3) { left: 30%; height: 110px; animation-duration: 1.1s; animation-delay: 0.4s; }
-        .drop:nth-child(4) { left: 40%; height: 130px; animation-duration: 1.3s; animation-delay: 0.1s; }
-        .drop:nth-child(5) { left: 50%; height: 105px; animation-duration: 1.15s; animation-delay: 0.3s; }
-        .drop:nth-child(6) { left: 60%; height: 125px; animation-duration: 1.25s; animation-delay: 0.5s; }
-
-        /* Loading Spinner Styles */
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-top: 3px solid rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        @keyframes mistShift {
+            from { transform: translate3d(0, 0, 0) scale(1); }
+            to { transform: translate3d(2%, -2%, 0) scale(1.06); }
         }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @media (max-width: 980px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+            .bottom-strip {
+                grid-template-columns: 1fr;
+            }
         }
-
-        .hidden { display: none; }
-
-        /* Favorite Button */
-        .favorite-btn {
-            transition: all 0.3s ease;
-            cursor: pointer;
-            font-size: 1.8rem;
-            filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0));
-        }
-
-        .favorite-btn:hover {
-            transform: scale(1.2);
-        }
-
-        .favorite-btn.active {
-            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
-            animation: favoritePopIn 0.3s ease;
-        }
-
-        @keyframes favoritePopIn {
-            0% { transform: scale(0.8); }
-            50% { transform: scale(1.3); }
-            100% { transform: scale(1.2); }
+        @media (max-width: 640px) {
+            .hero-grid,
+            .bottom-strip {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+            .hero-grid {
+                padding-top: 16px;
+            }
+            .left-panel,
+            .right-panel {
+                padding: 12px 4px;
+            }
+            .mini-hours {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
         }
     </style>
 </head>
-<body class="sky-bg {{ $weather['bg_theme'] ?? 'cloudy' }} text-white">
+<body class="text-white">
+    <div class="scene" id="rainScene" aria-hidden="true"></div>
 
-<div class="relative-wrapper flex flex-col items-center px-4 py-8 md:py-12">
+    <main class="dashboard">
+        <div class="weather-shell">
+            <div class="glass-noise"></div>
 
-    {{-- Back Button --}}
-    <div class="w-full max-w-2xl mb-8 fade-in">
-        <a href="{{ route('weather.index') }}" class="back-btn inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 font-semibold">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-            Back to Search
-        </a>
-    </div>
-
-    {{-- Weather Result --}}
-    <div class="w-full max-w-2xl mb-10 fade-in-delay">
-        {{-- Rain Alert --}}
-        @if($weather['is_raining'])
-        <div class="rain-alert mb-6 p-5 rounded-2xl bg-gradient-to-r from-blue-600/30 to-cyan-600/30 border border-blue-400/50 flex items-center gap-4">
-            <div class="text-3xl animate-bounce">🌧️</div>
-            <div class="flex-1">
-                <p class="font-bold text-blue-100 text-lg">It's currently raining!</p>
-                <p class="text-blue-200/80 text-sm">
-                    @if($weather['rain_mm'] > 0)
-                        Precipitation: <span class="font-semibold">{{ $weather['rain_mm'] }} mm/hour</span>
-                    @else
-                        Expect wet conditions
-                    @endif
-                </p>
-            </div>
-            <div class="rain-drops w-20 h-16">
-                <div class="drop"></div>
-                <div class="drop"></div>
-                <div class="drop"></div>
-                <div class="drop"></div>
-                <div class="drop"></div>
-                <div class="drop"></div>
-            </div>
-        </div>
-        @else
-        <div class="rain-alert mb-6 p-4 rounded-2xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-400/40 flex items-center gap-3">
-            <div class="text-2xl">☀️</div>
-            <p class="font-semibold text-green-200">No rain expected - clear skies ahead!</p>
-        </div>
-        @endif
-
-        <div class="glass weather-card rounded-3xl p-8 md:p-10 @if($weather['is_raining']) raining @endif">
-            {{-- Header with City Info --}}
-            <div class="flex items-start justify-between mb-8">
-                <div>
-                    <h2 class="display text-4xl md:text-5xl font-black mb-1">{{ $weather['city'] }}</h2>
-                    <div class="flex items-center gap-3">
-                        <span class="badge">{{ $weather['country'] }}</span>
-                        <p class="text-blue-300/70 text-sm capitalize">{{ $weather['condition'] }}</p>
-                    </div>
-                </div>
-                <div class="flex items-start gap-4">
-                    <button
-                        type="button"
-                        class="favorite-btn @if($weather['is_favorited']) active @endif"
-                        id="favoriteBtn"
-                        data-city="{{ $weather['city'] }}"
-                        data-country="{{ $weather['country'] }}"
-                        data-temperature="{{ $weather['temperature'] }}"
-                        data-condition="{{ $weather['condition'] }}"
-                        data-icon="{{ $weather['icon'] }}"
-                        title="Add to favorites"
-                    >
-                        @if($weather['is_favorited']) ❤️ @else 🤍 @endif
-                    </button>
-                    <img
-                        src="https://openweathermap.org/img/wn/{{ $weather['icon'] }}@4x.png"
-                        alt="{{ $weather['condition'] }}"
-                        class="weather-icon w-24 h-24 md:w-32 md:h-32 -mt-4"
-                    >
-                </div>
-            </div>
-
-            {{-- Main Temperature Display --}}
-            <div class="mb-8">
-                <div class="flex items-baseline gap-3 mb-3">
-                    <span class="temp-display">{{ $weather['temperature'] }}°</span>
-                    <div>
-                        <p class="text-blue-200 capitalize text-2xl font-semibold">{{ $weather['condition'] }}</p>
-                        <p class="text-blue-300/70 text-sm mt-1">Feels like <span class="font-semibold">{{ $weather['feels_like'] }}°C</span></p>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Enhanced Stats Grid --}}
-            <div class="grid grid-cols-3 gap-3 md:gap-4 mb-4">
-                <div class="stat-card glass rounded-2xl p-5 text-center group hover:scale-105">
-                    <p class="stat-label text-blue-300/60 text-xs mono uppercase tracking-wider mb-2 font-semibold">💧 Humidity</p>
-                    <p class="text-2xl md:text-3xl font-bold">{{ $weather['humidity'] }}<span class="text-sm text-blue-300 font-normal">%</span></p>
-                </div>
-                <div class="stat-card glass rounded-2xl p-5 text-center group hover:scale-105">
-                    <p class="stat-label text-blue-300/60 text-xs mono uppercase tracking-wider mb-2 font-semibold">💨 Wind Speed</p>
-                    <p class="text-2xl md:text-3xl font-bold">{{ $weather['wind_speed'] }}<span class="text-sm text-blue-300 font-normal"> km/h</span></p>
-                </div>
-                <div class="stat-card glass rounded-2xl p-5 text-center group hover:scale-105">
-                    <p class="stat-label text-blue-300/60 text-xs mono uppercase tracking-wider mb-2 font-semibold">🌡️ Range</p>
-                    <p class="text-2xl md:text-3xl font-bold">{{ $weather['temp_max'] }}<span class="text-blue-300 font-normal">/</span>{{ $weather['temp_min'] }}<span class="text-sm text-blue-300 font-normal">°</span></p>
-                </div>
-            </div>
-
-            {{-- Additional Weather Details --}}
-            <div class="grid grid-cols-2 gap-3">
-                <div class="stat-card glass rounded-2xl p-4 text-center group hover:scale-105">
-                    <p class="stat-label text-blue-300/60 text-xs mono uppercase tracking-wider mb-1 font-semibold">👁️ Visibility</p>
-                    <p class="text-xl font-bold">{{ $weather['visibility'] }}<span class="text-sm text-blue-300 font-normal"> km</span></p>
-                </div>
-                <div class="stat-card glass rounded-2xl p-4 text-center group hover:scale-105">
-                    <p class="stat-label text-blue-300/60 text-xs mono uppercase tracking-wider mb-1 font-semibold">🔽 Pressure</p>
-                    <p class="text-xl font-bold">{{ $weather['pressure'] }}<span class="text-sm text-blue-300 font-normal"> mb</span></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Favorites Section --}}
-    @if($favorites->isNotEmpty())
-    <div class="w-full max-w-2xl mb-10 fade-in-delay">
-        <div class="mb-4 flex items-center gap-2">
-            <span class="badge">⭐ Favorite Cities</span>
-            <p class="text-blue-300/60 text-sm">{{ $favorites->count() }} saved</p>
-        </div>
-        <div class="glass rounded-3xl overflow-hidden p-2">
-            <div class="space-y-1">
-                @foreach($favorites as $item)
-                <a href="{{ route('weather.view', ['city' => $item->city]) }}" class="history-item flex items-center justify-between px-5 py-4 rounded-xl hover:glass transition-all cursor-pointer group">
-                    <div class="flex items-center gap-4 flex-1">
-                        <span class="text-xl">⭐</span>
-                        <img 
-                            src="https://openweathermap.org/img/wn/{{ $item->icon }}@2x.png" 
-                            alt="{{ $item->condition }}" 
-                            class="w-10 h-10 opacity-90 group-hover:scale-110 transition-transform"
-                        >
+            <section class="hero-grid">
+                <div class="left-panel">
+                    <div class="flex items-start justify-between gap-4">
                         <div>
-                            <p class="font-semibold text-base">{{ $item->city }}</p>
-                            <p class="text-blue-300/70 text-sm capitalize">{{ $item->condition }}</p>
+                            <p class="section-label">WeatherNow</p>
+                            <p class="mt-3 text-sm text-white/60">{{ $weather['condition'] }}</p>
+                            <div class="mt-3 status-chip">
+                                <span>{{ $weather['ph_time']['label'] }}</span>
+                                <span>&bull;</span>
+                                <span>{{ $weather['ph_time']['date'] }}</span>
+                                <span>{{ $weather['ph_time']['time'] }} {{ $weather['ph_time']['timezone'] }}</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <a href="{{ route('weather.index', ['unit' => $weather['unit']['value']]) }}" class="action-btn">Home</a>
+                            <a href="{{ route('weather.view', ['city' => $weather['city'], 'unit' => 'metric', 'source' => $viewState['source'] ?? null]) }}" class="action-btn {{ $weather['unit']['value'] === 'metric' ? 'bg-white/18' : '' }}">C</a>
+                            <a href="{{ route('weather.view', ['city' => $weather['city'], 'unit' => 'imperial', 'source' => $viewState['source'] ?? null]) }}" class="action-btn {{ $weather['unit']['value'] === 'imperial' ? 'bg-white/18' : '' }}">F</a>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <p class="mono font-bold text-lg">{{ $item->temperature }}°C</p>
-                    </div>
-                </a>
-                @endforeach
-            </div>
-        </div>
-    </div>
-    @endif
 
-    {{-- Search History --}}
-    @if($history->isNotEmpty())
-    <div class="w-full max-w-2xl pb-10 fade-in-delay">
-        <div class="mb-4 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <span class="badge">📍 Recent Searches</span>
-                <p class="text-blue-300/60 text-sm">{{ $history->count() }} cities</p>
-            </div>
-            <form action="{{ route('weather.clearHistory') }}" method="POST" onsubmit="return confirm('Are you sure you want to clear all search history?');">
-                @csrf
-                <button type="submit" class="text-xs px-3 py-1 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 border border-red-400/30 hover:border-red-400/50 transition-all font-semibold">
-                    🗑️ Clear
-                </button>
-            </form>
-        </div>
-        <div class="glass rounded-3xl overflow-hidden p-2">
-            <div class="space-y-1">
-                @foreach($history as $item)
-                <a href="{{ route('weather.view', ['city' => $item->city]) }}" class="history-item flex items-center justify-between px-5 py-4 rounded-xl hover:glass transition-all cursor-pointer group">
-                    <div class="flex items-center gap-4 flex-1">
-                        <img 
-                            src="https://openweathermap.org/img/wn/{{ $item->icon }}@2x.png" 
-                            alt="{{ $item->condition }}" 
-                            class="w-10 h-10 opacity-90 group-hover:scale-110 transition-transform"
+                    <div class="mt-16 md:mt-28">
+                        <div class="flex items-end gap-4">
+                            <div class="temp-number">{{ $weather['temperature'] }}</div>
+                            <div class="pb-3">
+                                <div class="text-3xl font-semibold">{{ $weather['unit']['temperature'] }}</div>
+                                <img src="https://openweathermap.org/img/wn/{{ $weather['icon'] }}@2x.png" alt="{{ $weather['condition'] }}" class="h-16 w-16 opacity-90">
+                            </div>
+                        </div>
+                        <h1 class="display mt-4 text-3xl font-bold md:text-4xl">{{ $weather['city'] }}</h1>
+                        <p class="mt-2 text-white/68">{{ $weather['country'] }} &bull; Feels like {{ $weather['feels_like'] }}&deg;{{ $weather['unit']['temperature'] }}</p>
+                        <p class="mono mt-3 text-xs text-white/52">
+                            Comfort {{ $weather['comfort_score'] }}/100 &bull; AQ {{ $weather['air_quality']['label'] }} &bull; Best around {{ $weather['best_time_out']['label'] }}
+                        </p>
+                    </div>
+
+                    <div class="mt-10 flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            id="favoriteBtn"
+                            class="action-btn {{ $weather['is_favorited'] ? 'text-rose-100' : '' }}"
+                            data-city="{{ $weather['city'] }}"
+                            data-country="{{ $weather['country'] }}"
+                            data-temperature="{{ $weather['temperature'] }}"
+                            data-condition="{{ $weather['condition'] }}"
+                            data-icon="{{ $weather['icon'] }}"
+                            data-favorited="{{ $weather['is_favorited'] ? 'true' : 'false' }}"
                         >
-                        <div>
-                            <p class="font-semibold text-base">{{ $item->city }}, {{ $item->country }}</p>
-                            <p class="text-blue-300/70 text-sm capitalize">{{ $item->condition }}</p>
+                            {{ $weather['is_favorited'] ? 'Remove Favorite' : 'Save Favorite' }}
+                        </button>
+                        <div class="rounded-full border border-white/12 bg-white/6 px-4 py-2 text-sm text-white/72">
+                            {{ $weather['what_to_wear'] }}
                         </div>
                     </div>
-                    <div class="text-right">
-                        <p class="mono font-bold text-lg">{{ $item->temperature }}°C</p>
-                        <p class="text-blue-300/50 text-xs">{{ $item->created_at->diffForHumans() }}</p>
+                </div>
+
+                <div class="right-panel">
+                    <div class="soft-panel p-5">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="section-label">Hourly Outlook</p>
+                            <p class="text-[11px] text-white/50">Shown in PH time</p>
+                        </div>
+                        <div class="mini-hours mt-4">
+                            @foreach (collect($weather['forecast_hourly'])->take(6) as $index => $hour)
+                                <div class="mini-hour {{ $index === 0 ? 'ring-1 ring-white/18' : '' }}">
+                                    <p class="text-[11px] text-white/58">{{ $index === 0 ? 'Now' : $hour['time'] }}</p>
+                                    <img src="https://openweathermap.org/img/wn/{{ $hour['icon'] }}@2x.png" alt="{{ $hour['condition'] }}" class="mx-auto h-9 w-9">
+                                    <p class="text-sm font-semibold">{{ $hour['temperature'] }}&deg;</p>
+                                    <p class="text-[11px] text-white/56">{{ $hour['rain_chance'] }}%</p>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
-                </a>
-                @endforeach
-            </div>
+
+                    <div class="soft-panel p-5">
+                        <div class="flex items-center justify-between gap-4">
+                            <p class="section-label">5-Day Forecast</p>
+                            <p class="text-xs text-white/48">{{ $weather['rain_summary']['message'] }}</p>
+                        </div>
+                        <div class="mt-4">
+                            @foreach ($weather['forecast_daily'] as $day)
+                                <div class="forecast-row">
+                                    <div>
+                                        <p class="text-sm font-semibold">{{ $day['day'] }}</p>
+                                        <p class="text-[11px] text-white/48">{{ $day['date'] }}</p>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <img src="https://openweathermap.org/img/wn/{{ $day['icon'] }}@2x.png" alt="{{ $day['condition'] }}" class="h-9 w-9">
+                                        <div class="h-[2px] flex-1 rounded-full bg-white/10">
+                                            <div class="h-[2px] rounded-full bg-cyan-200/80" style="width: {{ max(18, min(100, $day['rain_chance'])) }}%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="text-right text-sm font-semibold text-white/82">
+                                        {{ $day['temp_max'] }}&deg;
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="soft-panel p-5">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="section-label">Details</p>
+                            <p class="text-[11px] text-white/50">API values formatted clearly</p>
+                        </div>
+                        <div class="metric-grid mt-4">
+                            <div class="metric-card">
+                                <p class="text-xs text-white/52">Humidity</p>
+                                <p class="mt-2 text-xl font-semibold">{{ $weather['humidity'] }}%</p>
+                            </div>
+                            <div class="metric-card">
+                                <p class="text-xs text-white/52">Wind</p>
+                                <p class="mt-2 text-xl font-semibold">{{ $weather['wind_speed'] }} {{ $weather['unit']['speed'] }}</p>
+                            </div>
+                            <div class="metric-card">
+                                <p class="text-xs text-white/52">Sunrise (PH)</p>
+                                <p class="mt-2 text-xl font-semibold">{{ $weather['sunrise'] }}</p>
+                            </div>
+                            <div class="metric-card">
+                                <p class="text-xs text-white/52">Sunset (PH)</p>
+                                <p class="mt-2 text-xl font-semibold">{{ $weather['sunset'] }}</p>
+                            </div>
+                            <div class="metric-card">
+                                <p class="text-xs text-white/52">Visibility</p>
+                                <p class="mt-2 text-xl font-semibold">{{ $weather['visibility'] }} {{ $weather['unit']['distance'] }}</p>
+                            </div>
+                            <div class="metric-card">
+                                <p class="text-xs text-white/52">Pressure</p>
+                                <p class="mt-2 text-xl font-semibold">{{ $weather['pressure'] }} mb</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bottom-strip">
+                <div class="strip-card">
+                    <p class="section-label">Alerts</p>
+                    <div class="mt-4 space-y-3">
+                        @foreach (collect($weather['smart_alerts'])->take(2) as $alert)
+                            <div>
+                                <p class="font-semibold">{{ $alert['title'] }}</p>
+                                <p class="mt-1 text-sm text-white/62">{{ $alert['message'] }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="strip-card">
+                    <p class="section-label">Saved Places</p>
+                    <div class="mt-4 space-y-3">
+                        @forelse (collect($favoriteSnapshots)->take(2) as $snapshot)
+                            <a href="{{ route('weather.view', ['city' => $snapshot['city'], 'source' => 'favorites', 'unit' => $weather['unit']['value']]) }}" class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <img src="https://openweathermap.org/img/wn/{{ $snapshot['icon'] }}@2x.png" alt="{{ $snapshot['condition'] }}" class="h-10 w-10">
+                                    <div>
+                                        <p class="font-semibold">{{ $snapshot['city'] }}</p>
+                                        <p class="text-xs text-white/54">{{ $snapshot['condition'] }}</p>
+                                    </div>
+                                </div>
+                                <p class="text-sm font-semibold">{{ round($snapshot['temperature']) }}&deg;</p>
+                            </a>
+                        @empty
+                            <p class="text-sm text-white/56">No saved cities yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="strip-card">
+                    <p class="section-label">Recent Searches</p>
+                    <div class="mt-4 space-y-3">
+                        @forelse (collect($history)->take(2) as $item)
+                            <a href="{{ route('weather.view', ['city' => $item->city, 'unit' => $weather['unit']['value']]) }}" class="flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold">{{ $item->city }}</p>
+                                    <p class="text-xs text-white/54">{{ $item->updated_at->diffForHumans() }}</p>
+                                </div>
+                                <p class="text-sm font-semibold">{{ round($item->temperature) }}&deg;</p>
+                            </a>
+                        @empty
+                            <p class="text-sm text-white/56">No search history yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
         </div>
-    </div>
-    @endif
+    </main>
 
-</div>
+    <script>
+        const openedFromFavorites = @json(($viewState['source'] ?? null) === 'favorites');
+        const favoriteBtn = document.getElementById('favoriteBtn');
 
-{{-- Rain Animation --}}
-@if($weather['is_raining'])
-<div class="rain-container" id="rainContainer"></div>
-@endif
-
-<script>
-    // Favorite button functionality
-    const favoriteBtn = document.getElementById('favoriteBtn');
-    if (favoriteBtn) {
-        favoriteBtn.addEventListener('click', async function() {
-            const city = this.dataset.city;
-            const country = this.dataset.country;
-            const temperature = this.dataset.temperature;
-            const condition = this.dataset.condition;
-            const icon = this.dataset.icon;
-
-            try {
-                const response = await fetch('/toggle-favorite', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                    },
-                    body: JSON.stringify({
-                        city,
-                        country,
-                        temperature,
-                        condition,
-                        icon
-                    })
-                });
-
-                const result = await response.json();
-                
-                if (result.is_favorited) {
-                    this.textContent = '❤️';
-                    this.classList.add('active');
-                } else {
-                    this.textContent = '🤍';
-                    this.classList.remove('active');
+        if (favoriteBtn) {
+            favoriteBtn.addEventListener('click', async function () {
+                if (this.disabled) {
+                    return;
                 }
-            } catch (error) {
-                console.error('Error toggling favorite:', error);
-                alert('Failed to toggle favorite');
+
+                try {
+                    this.disabled = true;
+                    const response = await fetch('{{ route('weather.toggleFavorite') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            city: this.dataset.city,
+                            country: this.dataset.country,
+                            temperature: this.dataset.temperature,
+                            condition: this.dataset.condition,
+                            icon: this.dataset.icon
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Favorite request failed.');
+                    }
+
+                    const result = await response.json();
+                    localStorage.setItem('weather-toast', result.is_favorited ? 'Added to favorites.' : 'Removed from favorites.');
+
+                    if (!result.is_favorited && openedFromFavorites) {
+                        window.location.href = '{{ route('weather.index', ['unit' => $weather['unit']['value']]) }}';
+                        return;
+                    }
+
+                    window.location.reload();
+                } catch (error) {
+                    alert('We could not update favorites right now.');
+                } finally {
+                    this.disabled = false;
+                }
+            });
+        }
+
+        const rainScene = document.getElementById('rainScene');
+        if (rainScene) {
+            const count = window.innerWidth < 768 ? 55 : 95;
+
+            for (let index = 0; index < count; index += 1) {
+                const drop = document.createElement('span');
+                drop.className = 'rain-drop';
+                drop.style.left = `${Math.random() * 118}%`;
+                drop.style.height = `${55 + Math.random() * 55}px`;
+                drop.style.animationDuration = `${0.65 + Math.random() * 0.75}s`;
+                drop.style.animationDelay = `${Math.random() * -2.2}s`;
+                drop.style.opacity = `${0.16 + Math.random() * 0.3}`;
+                rainScene.appendChild(drop);
             }
-        });
-    }
-
-    // Add CSRF token meta to head if not present
-    if (!document.querySelector('meta[name="csrf-token"]')) {
-        const meta = document.createElement('meta');
-        meta.name = 'csrf-token';
-        meta.content = document.querySelector('input[name="_token"]')?.value || '';
-        document.head.appendChild(meta);
-    }
-
-    // Create animated rain drops
-    @if($weather['is_raining'])
-    function createRain() {
-        const container = document.getElementById('rainContainer');
-        const rainDrop = document.createElement('div');
-        rainDrop.className = 'rain-drop';
-        
-        const randomLeft = Math.random() * 100;
-        const randomDelay = Math.random() * 0.5;
-        const randomDuration = 0.5 + Math.random() * 0.5; // 0.5s to 1s
-        
-        rainDrop.style.left = randomLeft + '%';
-        rainDrop.style.top = '-15px';
-        rainDrop.style.animationDuration = randomDuration + 's';
-        rainDrop.style.animationDelay = randomDelay + 's';
-        
-        container.appendChild(rainDrop);
-        
-        // Remove drop after animation completes
-        setTimeout(() => {
-            rainDrop.remove();
-        }, (randomDuration + randomDelay) * 1000);
-    }
-
-    // Create multiple rain drops continuously
-    setInterval(createRain, 100);
-    
-    // Create initial batch
-    for (let i = 0; i < 20; i++) {
-        setTimeout(createRain, i * 50);
-    }
-    @endif
-</script>
-
+        }
+    </script>
 </body>
 </html>
