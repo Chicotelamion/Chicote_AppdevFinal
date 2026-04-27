@@ -10,8 +10,13 @@ use Illuminate\Support\Facades\Http;
 
 class WeatherController extends Controller
 {
-    public function __construct(private WeatherService $weatherService)
+    public function __construct(private WeatherService $weatherService, private \App\Services\TyphoonService $typhoonService)
     {
+    }
+
+    public function activeTyphoons()
+    {
+        return response()->json($this->typhoonService->getActiveTyphoons());
     }
 
     public function index()

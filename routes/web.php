@@ -11,3 +11,4 @@ Route::post('/toggle-favorite', [WeatherController::class, 'toggleFavorite'])->n
 Route::delete('/favorites', [WeatherController::class, 'removeFavorite'])->name('weather.removeFavorite');
 Route::get('/api/suggestions', [WeatherController::class, 'citySuggestions'])->name('weather.suggestions');
 Route::get('/api/live-dashboard', [WeatherController::class, 'liveDashboard'])->name('weather.liveDashboard');
+Route::get('/api/typhoons', [WeatherController::class, 'activeTyphoons'])->name('weather.typhoons');

@@ -435,6 +435,52 @@
             attribution: '&copy; OpenWeatherMap',
             noWrap: true
         }).addTo(map);
+        
+        // Add Wind Speed Layer for Typhoon visualization
+        L.tileLayer(`https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${openWeatherKey}`, {
+            opacity: 0.5,
+            noWrap: true
+        }).addTo(map);
+
+        // Fetch and Plot Active Typhoons
+        let typhoonMarkers = [];
+        
+        function updateTyphoons() {
+            fetch('/api/typhoons')
+                .then(res => res.json())
+                .then(typhoons => {
+                    // Clear old markers
+                    typhoonMarkers.forEach(m => map.removeLayer(m));
+                    typhoonMarkers = [];
+
+                    typhoons.forEach(typhoon => {
+                        // Plot on map
+                        const marker = L.circleMarker([typhoon.lat, typhoon.lon], {
+                            color: 'red',
+                            fillColor: '#f03',
+                            fillOpacity: 0.5,
+                            radius: 12
+                        }).addTo(map);
+                        
+                        marker.bindPopup(`<b>${typhoon.name}</b><br>${typhoon.severity}<br>Wind: ${typhoon.wind_speed} km/h`);
+                        typhoonMarkers.push(marker);
+
+                        // Proximity Check (Mock logic: alert if within 500km of a known center)
+                        // In a real app, we would cross-reference with actual saved city coords.
+                        // For demonstration, we'll just trigger the alert if a typhoon exists.
+                        showToast(
+                            `CRITICAL: ${typhoon.severity} APPROACHING`, 
+                            `${typhoon.name} detected near lat ${typhoon.lat}. Winds at ${typhoon.wind_speed} km/h. Please stay vigilant.`, 
+                            true
+                        );
+                    });
+                })
+                .catch(err => console.error('Failed to fetch typhoons', err));
+        }
+
+        // Fetch immediately and then every 5 mins
+        updateTyphoons();
+        setInterval(updateTyphoons, 5 * 60 * 1000);
     </script>
 </body>
 </html>
