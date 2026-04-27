@@ -7,6 +7,8 @@
     <title>WeatherNow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         body { font-family: 'DM Sans', sans-serif; }
         .display { font-family: 'Poppins', sans-serif; }
@@ -24,6 +26,7 @@
             backdrop-filter: blur(18px);
             box-shadow: 0 18px 60px rgba(8, 18, 35, 0.28);
         }
+        .leaflet-container { z-index: 10 !important; }
         .search-input:focus { outline: none; }
         .suggestions-list {
             position: absolute;
@@ -45,7 +48,10 @@
             <div class="glass rounded-[2rem] px-6 py-6 md:px-8">
                 <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <p class="text-xs uppercase tracking-[0.35em] text-blue-200/70">Smart Weather Hub</p>
+                        <div class="flex items-center gap-3">
+                            <p class="text-xs uppercase tracking-[0.35em] text-blue-200/70" id="dynamic-greeting">Smart Weather Hub</p>
+                            <span class="rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-0.5 text-xs font-semibold text-sky-300" id="ph-clock">--:--:--</span>
+                        </div>
                         <h1 class="display mt-3 text-4xl font-black tracking-tight md:text-6xl">WeatherNow</h1>
                         <p class="mt-3 max-w-2xl text-base text-blue-100/80 md:text-lg">
                             Search any city, compare saved places, use your current location, and plan the best time to head out.
@@ -79,8 +85,8 @@
                 <input type="hidden" name="lat" id="latInput">
                 <input type="hidden" name="lon" id="lonInput">
                 <input type="hidden" name="source" value="search">
-                <div class="relative">
-                    <div class="flex flex-col gap-3 md:flex-row">
+                <div class="relative mb-6">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center">
                         <div class="flex flex-1 items-center gap-3 rounded-[1.4rem] border border-white/10 bg-white/5 px-5 py-4">
                             <svg class="h-6 w-6 flex-shrink-0 text-blue-200/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -96,7 +102,7 @@
                                 class="search-input w-full bg-transparent text-lg text-white placeholder:text-blue-100/45"
                             >
                         </div>
-                        <button type="submit" id="searchBtn" class="rounded-[1.4rem] bg-white px-6 py-4 text-base font-semibold text-slate-900 transition hover:bg-blue-50">
+                        <button type="submit" id="searchBtn" class="rounded-[1.4rem] bg-white px-6 py-4 text-base font-semibold text-slate-900 transition hover:bg-blue-50 md:ml-3 mt-3 md:mt-0">
                             <span id="searchBtnText">Discover</span>
                         </button>
                     </div>
@@ -110,7 +116,7 @@
             </form>
         </section>
 
-        <section class="mb-8 grid gap-6 lg:grid-cols-[1.45fr,0.95fr]">
+        <section class="mb-8 grid gap-6 lg:grid-cols-[1.45fr,0.95fr] mt-6">
             <div class="glass rounded-[2rem] p-6">
                 <div class="mb-5 flex items-center justify-between gap-3">
                     <div>
@@ -196,6 +202,17 @@
                     </div>
                 @endif
             </div>
+
+            <!-- Live Radar Map -->
+            <div class="glass rounded-[2rem] p-6 lg:col-span-2">
+                <div class="mb-5 flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-blue-200/70">Live Radar</p>
+                        <h2 class="display mt-2 text-2xl font-bold">Precipitation & Clouds</h2>
+                    </div>
+                </div>
+                <div id="weather-map" class="h-[400px] w-full rounded-2xl border border-white/10 bg-black/20"></div>
+            </div>
         </section>
 
         <section class="glass rounded-[2rem] p-6">
@@ -241,6 +258,9 @@
             @endif
         </section>
     </div>
+
+    <!-- Alert Toast Container -->
+    <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-3"></div>
 
     <script>
         const cityInput = document.getElementById('cityInput');
@@ -323,11 +343,98 @@
             }, { enableHighAccuracy: true, timeout: 10000 });
         });
 
-        const toast = localStorage.getItem('weather-toast');
-        if (toast) {
-            alert(toast);
+        const toastContainer = document.getElementById('toast-container');
+        function showToast(title, message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `flex max-w-sm transform items-start gap-3 rounded-2xl border ${isError ? 'border-red-500/30 bg-red-500/90 text-white' : 'border-blue-300/30 bg-blue-600/90 text-white'} p-4 shadow-2xl backdrop-blur-md transition-all duration-300 translate-y-[-100%] opacity-0`;
+            toast.innerHTML = `
+                <div class="flex-1">
+                    <p class="font-semibold text-sm">${title}</p>
+                    <p class="mt-1 text-xs opacity-90">${message}</p>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-[-100%]', 'opacity-0');
+            });
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        const storedToast = localStorage.getItem('weather-toast');
+        if (storedToast) {
+            showToast('Update', storedToast);
             localStorage.removeItem('weather-toast');
         }
+
+        // --- Real-Time Features ---
+
+        // 1. Live Ticking Clock (PH Time)
+        const clockEl = document.getElementById('ph-clock');
+        const greetingEl = document.getElementById('dynamic-greeting');
+        
+        function updateClock() {
+            const now = new Date();
+            const options = { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            const timeString = now.toLocaleTimeString('en-US', options);
+            clockEl.textContent = `${timeString} PHT`;
+
+            const hour = parseInt(now.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: '2-digit', hour12: false }), 10);
+            if (hour >= 5 && hour < 12) greetingEl.textContent = 'Good Morning';
+            else if (hour >= 12 && hour < 18) greetingEl.textContent = 'Good Afternoon';
+            else greetingEl.textContent = 'Good Evening';
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 2. Auto-Refreshing Dashboard
+        function fetchLiveDashboard() {
+            fetch('/api/live-dashboard?unit={{ $unit['value'] }}')
+                .then(res => res.json())
+                .then(data => {
+                    // Alert if high rain chance
+                    if (data.favoriteSnapshots && data.favoriteSnapshots.length > 0) {
+                        const highestRain = data.favoriteSnapshots.reduce((max, city) => Math.max(max, city.rain_chance || 0), 0);
+                        if (highestRain >= 60) {
+                            showToast('Weather Alert', 'High chance of rain detected in one of your saved locations.');
+                        }
+                    }
+                    // For a full seamless update, we would use Alpine.js or React here. 
+                    // Since it's Blade, we can silently reload the page data if we detect changes 
+                    // without scrolling. But for now, the toast handles the "alert" part.
+                    console.log('Dashboard data silently refreshed.');
+                })
+                .catch(err => console.error('Silent refresh failed', err));
+        }
+        setInterval(fetchLiveDashboard, 5 * 60 * 1000); // 5 minutes
+
+        // 3. Live Radar Map (Leaflet + OpenWeatherMap)
+        const map = L.map('weather-map', {
+            maxBounds: [
+                [-90, -180],
+                [90, 180]
+            ],
+            maxBoundsViscosity: 1.0,
+            minZoom: 5
+        }).setView([12.8797, 121.7740], 6); // Default to Philippines, zoomed in
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://carto.com/">Carto</a>',
+            noWrap: true
+        }).addTo(map);
+
+        const openWeatherKey = '{{ config('services.openweather.key') }}';
+        L.tileLayer(`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${openWeatherKey}`, {
+            opacity: 0.7,
+            attribution: '&copy; OpenWeatherMap',
+            noWrap: true
+        }).addTo(map);
     </script>
 </body>
 </html>

@@ -12,10 +12,37 @@
             font-family: 'DM Sans', sans-serif;
             min-height: 100vh;
             overflow-x: hidden;
+        }
+        /* Dynamic Weather Backgrounds */
+        .sunny-bg {
             background:
-                radial-gradient(circle at 20% 20%, rgba(170, 214, 210, 0.16), transparent 28%),
-                radial-gradient(circle at 75% 25%, rgba(145, 187, 196, 0.12), transparent 24%),
-                linear-gradient(135deg, #2f4b4b 0%, #142222 48%, #0b1415 100%);
+                radial-gradient(circle at top left, rgba(253, 224, 71, 0.22), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(249, 115, 22, 0.25), transparent 30%),
+                linear-gradient(135deg, #1e1b4b 0%, #4c1d95 45%, #e11d48 100%);
+        }
+        .rainy-bg {
+            background:
+                radial-gradient(circle at top left, rgba(148, 163, 184, 0.22), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(51, 65, 85, 0.25), transparent 30%),
+                linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #334155 100%);
+        }
+        .cloudy-bg {
+            background:
+                radial-gradient(circle at top left, rgba(226, 232, 240, 0.15), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(148, 163, 184, 0.15), transparent 30%),
+                linear-gradient(135deg, #1e293b 0%, #334155 45%, #475569 100%);
+        }
+        .clear-bg {
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.22), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.25), transparent 30%),
+                linear-gradient(135deg, #081223 0%, #13325b 45%, #235b92 100%);
+        }
+        .default-bg {
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.22), transparent 30%),
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.25), transparent 30%),
+                linear-gradient(135deg, #081223 0%, #13325b 45%, #235b92 100%);
         }
         .display { font-family: 'Poppins', sans-serif; }
         .mono { font-family: 'Space Mono', monospace; }
@@ -72,15 +99,17 @@
             justify-content: center;
             padding: 28px 16px;
         }
+        .weather-shell, .soft-panel, .strip-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 18px 60px rgba(8, 18, 35, 0.28);
+        }
         .weather-shell {
             width: min(1180px, 100%);
             position: relative;
             border-radius: 30px;
             overflow: hidden;
-            background: rgba(18, 28, 29, 0.34);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 24px 90px rgba(0, 0, 0, 0.32);
-            backdrop-filter: blur(16px);
         }
         .weather-shell::before {
             content: '';
@@ -125,11 +154,7 @@
             padding: 18px;
         }
         .soft-panel {
-            background: rgba(10, 17, 18, 0.34);
-            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 22px;
-            backdrop-filter: blur(14px);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
         .temp-number {
             font-family: 'Poppins', sans-serif;
@@ -160,6 +185,11 @@
             display: grid;
             grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none; /* Firefox */
+        }
+        .mini-hours::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
         }
         .mini-hour {
             text-align: center;
@@ -211,8 +241,6 @@
         .strip-card {
             padding: 18px;
             border-radius: 22px;
-            background: rgba(10, 17, 18, 0.32);
-            border: 1px solid rgba(255, 255, 255, 0.08);
         }
         @keyframes rain {
             0% {
@@ -254,12 +282,28 @@
                 padding: 12px 4px;
             }
             .mini-hours {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
+                grid-auto-flow: column;
+                grid-template-columns: unset;
+                grid-auto-columns: minmax(70px, 1fr);
             }
         }
     </style>
 </head>
-<body class="text-white">
+<body class="text-white
+    @php
+        $condition = strtolower($weather['condition']);
+        $bgClass = 'default-bg';
+        if (str_contains($condition, 'sunny') || str_contains($condition, 'clear sky')) {
+            $bgClass = 'sunny-bg';
+        } elseif (str_contains($condition, 'rain')) {
+            $bgClass = 'rainy-bg';
+        } elseif (str_contains($condition, 'cloud')) {
+            $bgClass = 'cloudy-bg';
+        } elseif (str_contains($condition, 'clear')) {
+            $bgClass = 'clear-bg';
+        }
+    @endphp
+    {{ $bgClass }}">
     <div class="scene" id="rainScene" aria-hidden="true"></div>
 
     <main class="dashboard">
@@ -280,9 +324,16 @@
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <a href="{{ route('weather.index', ['unit' => $weather['unit']['value']]) }}" class="action-btn">Home</a>
-                            <a href="{{ route('weather.view', ['city' => $weather['city'], 'unit' => 'metric', 'source' => $viewState['source'] ?? null]) }}" class="action-btn {{ $weather['unit']['value'] === 'metric' ? 'bg-white/18' : '' }}">C</a>
-                            <a href="{{ route('weather.view', ['city' => $weather['city'], 'unit' => 'imperial', 'source' => $viewState['source'] ?? null]) }}" class="action-btn {{ $weather['unit']['value'] === 'imperial' ? 'bg-white/18' : '' }}">F</a>
+                            <a href="{{ route('weather.index', ['unit' => $weather['unit']['value']]) }}" class="action-btn flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                  <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+                                </svg>
+                                Back to Dashboard
+                            </a>
+                            <div class="ml-2 flex items-center gap-2 border-l border-white/20 pl-4">
+                                <a href="{{ route('weather.view', ['city' => $weather['city'], 'unit' => 'metric', 'source' => $viewState['source'] ?? null]) }}" class="action-btn {{ $weather['unit']['value'] === 'metric' ? 'bg-white/18' : '' }}">C</a>
+                                <a href="{{ route('weather.view', ['city' => $weather['city'], 'unit' => 'imperial', 'source' => $viewState['source'] ?? null]) }}" class="action-btn {{ $weather['unit']['value'] === 'imperial' ? 'bg-white/18' : '' }}">F</a>
+                            </div>
                         </div>
                     </div>
 

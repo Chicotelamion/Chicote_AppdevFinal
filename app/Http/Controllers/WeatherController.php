@@ -180,6 +180,22 @@ class WeatherController extends Controller
         }
     }
 
+    public function liveDashboard(Request $request)
+    {
+        $unit = $this->currentUnit($request);
+        $history = SearchHistory::latest()->take(10)->get();
+        $favorites = Favorite::latest()->get();
+        $favoriteSnapshots = $this->weatherService->getFavoriteSnapshots($favorites, $unit);
+        $compareSnapshots = $favoriteSnapshots->take(3)->values();
+
+        return response()->json([
+            'history' => $history,
+            'favoriteSnapshots' => $favoriteSnapshots,
+            'compareSnapshots' => $compareSnapshots,
+            'unit' => $this->weatherService->getUnitMeta($unit),
+        ]);
+    }
+
     private function renderWeatherResult(array $weather, array $viewState = [])
     {
         $weather['is_favorited'] = Favorite::where('city', $weather['city'])
